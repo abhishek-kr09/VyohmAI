@@ -141,6 +141,15 @@ def create_calendar_event(
     return _event_response(event)
 
 
+@router.delete("/calendar-events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_calendar_event(event_id: str, db: Session = Depends(get_db)) -> None:
+    event = db.get(CalendarEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Calendar event not found")
+    db.delete(event)
+    db.commit()
+
+
 @router.get("/email-drafts", response_model=list[EmailDraftResponse])
 def list_email_drafts(db: Session = Depends(get_db)) -> list[EmailDraft]:
     return list(db.scalars(select(EmailDraft).order_by(EmailDraft.created_at.desc())))
@@ -179,3 +188,12 @@ def create_email_draft(
     db.commit()
     db.refresh(draft)
     return draft
+
+
+@router.delete("/email-drafts/{draft_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_email_draft(draft_id: str, db: Session = Depends(get_db)) -> None:
+    draft = db.get(EmailDraft, draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Email draft not found")
+    db.delete(draft)
+    db.commit()

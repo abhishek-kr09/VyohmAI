@@ -54,7 +54,7 @@ def _plan(instruction: str, context: str) -> AgentPlan:
     try:
         response = httpx.post(
             "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"******"},
+            headers={"Authorization": f"Bearer {settings.groq_api_key}"},
             json={
                 "model": settings.llm_model,
                 "temperature": 0,

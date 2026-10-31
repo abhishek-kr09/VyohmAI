@@ -105,7 +105,11 @@ def _parse_completion(content: str) -> ChatCompletion:
         raise RuntimeError("LLM returned invalid structured chat JSON") from exc
 
 
-def _answer_from_llm(question: str, retrieved: list[RetrievedEvidence]) -> ChatCompletion:
+def _answer_from_llm(
+    question: str,
+    retrieved: list[RetrievedEvidence],
+    retry: bool = False,
+) -> ChatCompletion:
     settings = get_settings()
     if not settings.groq_api_key or not settings.llm_model:
         raise RuntimeError("GROQ_API_KEY and LLM_MODEL must be configured for chat")
@@ -120,8 +124,14 @@ def _answer_from_llm(question: str, retrieved: list[RetrievedEvidence]) -> ChatC
         "Citations must be a list of zero-based evidence indexes. Every factual claim must have at "
         "least one citation. If the evidence does not answer the question, say that the recordings "
         "do not contain enough evidence and use an empty citations list. Never invent speakers, "
-        "names, dates, deadlines, or commitments."
+        "names, dates, deadlines, or commitments. If any supplied evidence directly answers the "
+        "question, you MUST include its zero-based index in citations."
     )
+    if retry:
+        system_prompt += (
+            " This is a citation correction attempt: review the evidence again and do not return "
+            "an empty citations list when it contains a direct answer."
+        )
     payload = {
         "model": settings.llm_model,
         "temperature": 0,
@@ -169,6 +179,12 @@ def answer_question(question: str, recording_id: str | None = None) -> tuple[str
         index for index in completion.citations
         if 0 <= index < len(retrieved)
     ]
+    if not valid_indexes:
+        completion = _answer_from_llm(question, retrieved, retry=True)
+        valid_indexes = [
+            index for index in completion.citations
+            if 0 <= index < len(retrieved)
+        ]
     if not valid_indexes:
         return (
             "I found related transcript content, but it does not provide enough evidence "
