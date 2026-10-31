@@ -13,6 +13,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+./backend/test_recording.wav
 
 # Runtime data and local recordings
 *.db

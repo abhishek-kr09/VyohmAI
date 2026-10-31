@@ -5,10 +5,9 @@ import "./index.css";
 
 const navItems = [
   { to: "/", label: "Overview", icon: "⌂", end: true },
-  { to: "/recordings", label: "Recordings", icon: "◉" },
+  { to: "/sessions", label: "Sessions", icon: "◉" },
   { to: "/assistant", label: "AI Assistant", icon: "✦" },
   { to: "/actions", label: "Actions", icon: "✓" },
-  { to: "/insights", label: "Insights", icon: "▣" },
 ];
 
 function Layout() {
@@ -34,7 +33,7 @@ function Layout() {
       </aside>
       <main className="main-content">
         <header className="topbar"><div className="mobile-brand">PocketRecorder</div><div className="topbar-actions"><span className="topbar-date">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</span><button className="icon-button" aria-label="Notifications">⌁</button><div className="avatar small">AK</div></div></header>
-        <div className="page-container"><Routes><Route path="/" element={<Dashboard />} /><Route path="/recordings" element={<Recordings />} /><Route path="/recordings/:recordingId" element={<RecordingDetails />} /><Route path="/assistant" element={<Assistant />} /><Route path="/actions" element={<Actions />} /><Route path="/insights" element={<Insights />} /></Routes></div>
+        <div className="page-container"><Routes><Route path="/" element={<Dashboard />} /><Route path="/sessions" element={<Sessions />} /><Route path="/sessions/:recordingId" element={<RecordingDetails />} /><Route path="/recordings" element={<Sessions />} /><Route path="/recordings/:recordingId" element={<RecordingDetails />} /><Route path="/assistant" element={<Assistant />} /><Route path="/actions" element={<Actions />} /><Route path="/insights" element={<Sessions />} /></Routes></div>
       </main>
     </div>
   );
@@ -52,14 +51,14 @@ function Dashboard() {
   }, []);
   const totalSeconds = recordings.reduce((sum, item) => sum + item.duration_ms / 1000, 0);
   const completed = recordings.filter((item) => item.status === "completed").length;
-  return <><PageHeading eyebrow="YOUR WORKSPACE" title="Good morning, Abhishek" subtitle="Here's what's happening with your recordings." action={<Link className="primary-button" to="/recordings">View recordings <span>→</span></Link>} />
+  return <><PageHeading eyebrow="YOUR WORKSPACE" title="Good morning, Abhishek" subtitle="Here's what's happening with your sessions." action={<Link className="primary-button" to="/sessions">View sessions <span>→</span></Link>} />
     {error && <ErrorBanner message={error} />}
-    <div className="stat-grid"><Stat label="Total recordings" value={recordings.length} detail="All time" icon="◉" /><Stat label="Total duration" value={formatDuration(totalSeconds)} detail="Across all recordings" icon="◷" /><Stat label="Transcribed" value={`${completed}/${recordings.length}`} detail="Ready to review" icon="✓" /></div>
-    <section className="content-card recent-card"><div className="section-heading"><div><h2>Recent recordings</h2><p>Your latest conversations, all in one place.</p></div><Link to="/recordings" className="text-link">View all <span>→</span></Link></div>{recordings.length === 0 ? <EmptyState title="No recordings yet" text="Upload your first recording to start building your knowledge base." /> : <RecordingTable recordings={recordings.slice(0, 5)} />}</section>
+    <div className="stat-grid"><Stat label="Total sessions" value={recordings.length} detail="All time" icon="◉" /><Stat label="Total duration" value={formatDuration(totalSeconds)} detail="Across all sessions" icon="◷" /><Stat label="Transcribed" value={`${completed}/${recordings.length}`} detail="Ready to review" icon="✓" /></div>
+    <section className="content-card recent-card"><div className="section-heading"><div><h2>Recent sessions</h2><p>Your latest conversations, all in one place.</p></div><Link to="/sessions" className="text-link">View all <span>→</span></Link></div>{recordings.length === 0 ? <EmptyState title="No sessions yet" text="Start a session on the device to build your knowledge base." /> : <RecordingTable recordings={recordings.slice(0, 5)} />}</section>
   </>;
 }
 
-function Recordings() {
+function SessionsLegacy() {
   const [recordings, setRecordings] = useState([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
@@ -73,7 +72,7 @@ function Recordings() {
     return () => { active = false; clearInterval(timer); };
   }, []);
   useEffect(() => { const timer = setTimeout(() => { if (query.trim().length >= 2) api.get("/search", { params: { q: query } }).then((response) => setResults(response.data)); else setResults(null); }, 250); return () => clearTimeout(timer); }, [query]);
-  return <><PageHeading eyebrow="LIBRARY" title="Recordings" subtitle="Review, search, and revisit every conversation." />{error && <ErrorBanner message={error} />}<div className="search-wrap"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search conversations, names, or topics..." /><kbd>⌘ K</kbd></div>{results ? <SearchResults results={results} /> : loading ? <Loading /> : <section className="content-card"><div className="section-heading"><div><h2>All recordings</h2><p>{recordings.length} conversation{recordings.length === 1 ? "" : "s"} · updates automatically</p></div></div><RecordingTable recordings={recordings} /></section>}</>;
+  return <><PageHeading eyebrow="SESSIONS" title="Sessions" subtitle="Review, search, and revisit every conversation." />{error && <ErrorBanner message={error} />}<div className="search-wrap"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sessions, names, or topics..." /><kbd>⌘ K</kbd></div>{results ? <SearchResults results={results} /> : loading ? <Loading /> : <section className="content-card"><div className="section-heading"><div><h2>All sessions</h2><p>{recordings.length} session{recordings.length === 1 ? "" : "s"} · updates automatically</p></div></div><RecordingTable recordings={recordings} /></section>}</>;
 }
 
 function RecordingDetails() {
@@ -99,7 +98,11 @@ function RecordingDetails() {
       setError(requestError.response?.data?.detail || "Could not retry transcription.");
     }
   };
-  return <><Link className="back-link" to="/recordings">← Back to recordings</Link><PageHeading eyebrow="RECORDING" title={recording.filename} subtitle={`${formatDate(recording.recorded_at)} · ${recording.device_id}`} /><div className="detail-layout"><section className="content-card transcript-card"><div className="section-heading"><div><h2>Transcript</h2><p>{recording.transcript.length} timestamped segments{recording.status === "processing" ? " · updating automatically" : ""}</p></div><Status status={recording.status} /></div><audio ref={audioRef} controls className="audio-player" src={`${api.defaults.baseURL}/recordings/${recording.id}/audio`} />{recording.transcript.length ? <div className="transcript-list">{recording.transcript.map((segment) => <button className="transcript-row" key={segment.id} onClick={() => seek(segment.start_time)}><span className="timestamp">{formatTime(segment.start_time)}</span><span>{segment.text}</span></button>)}</div> : <EmptyState title="Transcript not available" text={recording.status === "failed" ? "Transcription failed. Retry it below." : "This recording is still being processed. This page checks for updates automatically."} />}{recording.status === "failed" && <button className="primary-button retry-button" onClick={retry}>Retry transcription <span>↻</span></button>}</section><aside className="content-card metadata-card"><h2>Recording details</h2><Meta label="Recorded" value={formatDate(recording.recorded_at)} /><Meta label="Duration" value={formatDuration(recording.duration_ms / 1000)} /><Meta label="Device" value={recording.device_id} /><Meta label="Battery" value={recording.battery_pct == null ? "USB powered" : `${recording.battery_pct}%`} /></aside></div><InsightPanel recording={recording} /></>;
+  return <><Link className="back-link" to="/sessions">← Back to sessions</Link><PageHeading eyebrow="SESSION" title={recording.insight?.topic || recording.filename} subtitle={`${formatDate(recording.recorded_at)} · ${recording.device_id}`} /><div className="detail-layout"><section className="content-card transcript-card"><div className="section-heading"><div><h2>Transcript</h2><p>{recording.transcript.length} timestamped segments{recording.status === "processing" ? " · updating automatically" : ""}</p></div><Status status={recording.status} /></div><audio ref={audioRef} controls className="audio-player" src={`${api.defaults.baseURL}/recordings/${recording.id}/audio`} />{recording.transcript.length ? <div className="transcript-list">{recording.transcript.map((segment) => <button className="transcript-row" key={segment.id} onClick={() => seek(segment.start_time)}><span className="timestamp">{formatTime(segment.start_time)}</span><span>{segment.text}</span></button>)}</div> : <EmptyState title="Transcript not available" text={recording.status === "failed" ? "Transcription failed. Retry it below." : "This session is still being processed. This page checks for updates automatically."} />}{recording.status === "failed" && <button className="primary-button retry-button" onClick={retry}>Retry transcription <span>↻</span></button>}</section><aside className="content-card metadata-card"><h2>Session details</h2><Meta label="Recorded" value={formatDate(recording.recorded_at)} /><Meta label="Duration" value={formatDuration(recording.duration_ms / 1000)} /><Meta label="Device" value={recording.device_id} /><Meta label="Battery" value={recording.battery_pct == null ? "USB powered" : `${recording.battery_pct}%`} /></aside></div><InsightPanel recording={recording} /><SessionTools recordingId={recording.id} /></>;
+}
+
+function SessionTools({ recordingId }) {
+  return <section className="session-tools"><Link className="primary-button" to={`/assistant?recording_id=${recordingId}`}>Ask about this session <span>→</span></Link><Link className="secondary-button" to="/actions">Open action agent <span>→</span></Link></section>;
 }
 
 function InsightPanel({ recording }) {
@@ -117,10 +120,10 @@ function InsightPanel({ recording }) {
         setExtracting(false);
       }
     };
-    return <section className="content-card insight-panel"><div className="assistant-icon">✦</div><h2>Understand this recording</h2><p>Generate a grounded summary, people, meetings, and action items from the transcript.</p>{error && <div className="error-banner">{error}</div>}<button className="primary-button" onClick={generate} disabled={extracting}>{extracting ? "Generating..." : "Generate insights"} {!extracting && <span>→</span>}</button></section>;
+    return <section className="content-card insight-panel"><div className="assistant-icon">✦</div><h2>Understand this session</h2><p>Generate a grounded summary, people, meetings, and action items from the transcript.</p>{error && <div className="error-banner">{error}</div>}<button className="primary-button" onClick={generate} disabled={extracting}>{extracting ? "Generating..." : "Generate insights"} {!extracting && <span>→</span>}</button></section>;
   }
   if (!recording.insight) return null;
-  return <section className="content-card insight-panel"><div className="section-heading"><div><h2>AI insights</h2><p>Structured information extracted from this transcript.</p></div><span className="status completed"><span />ready</span></div>{recording.insight.summary && <p className="insight-summary">{recording.insight.summary}</p>}<div className="insight-columns"><div><h3>People</h3>{recording.insight.people.length ? recording.insight.people.map((person) => <div className="insight-item" key={person.name}><strong>{person.name}</strong><span>{person.role || "Mentioned in transcript"}</span></div>) : <p className="muted">No people identified.</p>}</div><div><h3>Action items</h3>{recording.action_items.length ? recording.action_items.map((item) => <div className="insight-item" key={item.id}><strong>{item.task}</strong><span>{item.person || "Owner not specified"}{item.due_date ? ` · Due ${formatDate(item.due_date)}` : ""}</span></div>) : <p className="muted">No action items identified.</p>}</div></div></section>;
+  return <section className="content-card insight-panel"><div className="section-heading"><div><h2>Session intelligence</h2><p>Everything extracted from this session.</p></div><span className="status completed"><span />ready</span></div>{recording.insight.topic && <div className="insight-summary"><strong>Topic</strong><p>{recording.insight.topic}</p></div>}{recording.insight.summary && <p className="insight-summary"><strong>Summary</strong><br />{recording.insight.summary}</p>}<div className="insight-columns"><div><h3>Important highlights</h3>{recording.insight.highlights.length ? <ul className="insight-list">{recording.insight.highlights.map((highlight, index) => <li key={index}>{highlight}</li>)}</ul> : <p className="muted">No highlights identified.</p>}</div><div><h3>People and meetings</h3>{recording.insight.people.length ? recording.insight.people.map((person) => <div className="insight-item" key={person.name}><strong>{person.name}</strong><span>{person.role || "Mentioned in session"}</span></div>) : <p className="muted">No people identified.</p>}{recording.insight.meetings.length ? recording.insight.meetings.map((meeting, index) => <div className="insight-item" key={index}><strong>{meeting.purpose || "Meeting"}</strong><span>{meeting.date || ""} {meeting.time || ""}</span></div>) : null}</div><div><h3>Action items</h3>{recording.action_items.length ? recording.action_items.map((item) => <div className="insight-item" key={item.id}><strong>{item.task}</strong><span>{item.person || "Owner not specified"}{item.due_date ? ` · Due ${formatDate(item.due_date)}` : ""}</span></div>) : <p className="muted">No action items identified.</p>}</div></div></section>;
 }
 
 function Assistant() {
@@ -163,20 +166,42 @@ function Actions() {
   const [recordings, setRecordings] = useState([]);
   const [events, setEvents] = useState([]);
   const [drafts, setDrafts] = useState([]);
+  const [dailyActions, setDailyActions] = useState([]);
+  const [instruction, setInstruction] = useState("");
+  const [agentMessage, setAgentMessage] = useState("");
   const [calendar, setCalendar] = useState({ title: "", description: "", start_time: "", end_time: "", attendees: "", source_recording_id: "" });
   const [email, setEmail] = useState({ recipient: "", subject: "", body: "", source_recording_id: "" });
   const [calendarPreview, setCalendarPreview] = useState(null);
   const [emailPreview, setEmailPreview] = useState(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    Promise.all([api.get("/recordings"), api.get("/actions/calendar-events"), api.get("/actions/email-drafts")])
-      .then(([recordingResult, eventResult, draftResult]) => {
+    Promise.all([api.get("/recordings"), api.get("/actions/calendar-events"), api.get("/actions/email-drafts"), api.get("/actions/daily")])
+      .then(([recordingResult, eventResult, draftResult, dailyResult]) => {
         setRecordings(recordingResult.data);
         setEvents(eventResult.data);
         setDrafts(draftResult.data);
+        setDailyActions(dailyResult.data);
       })
       .catch(() => setError("Could not load saved actions."));
   }, []);
+  const runAgent = async (event) => {
+    event.preventDefault();
+    setError("");
+    setAgentMessage("");
+    try {
+      const result = await api.post("/actions/agent", { instruction });
+      setAgentMessage(result.data.message);
+      setInstruction("");
+      const [eventResult, draftResult, dailyResult] = await Promise.all([
+        api.get("/actions/calendar-events"),
+        api.get("/actions/email-drafts"),
+        api.get("/actions/daily"),
+      ]);
+      setEvents(eventResult.data);
+      setDrafts(draftResult.data);
+      setDailyActions(dailyResult.data);
+    } catch (requestError) { setError(requestError.response?.data?.detail || "The action agent could not complete that instruction."); }
+  };
   const previewEvent = async (event) => {
     event.preventDefault();
     setError("");
@@ -210,7 +235,9 @@ function Actions() {
       setEmail({ recipient: "", subject: "", body: "", source_recording_id: "" });
     } catch (requestError) { setError(requestError.response?.data?.detail || "Could not save the email draft."); }
   };
-  return <><PageHeading eyebrow="ACTIONS" title="Turn insights into action" subtitle="Preview first, then confirm. Pocket Recorder never sends email or creates external events automatically." />{error && <ErrorBanner message={error} />}
+  return <><PageHeading eyebrow="ACTIONS" title="Turn insights into action" subtitle="Give the action agent an instruction. It uses extracted session actions to create local events, save drafts, or complete tasks." />{error && <ErrorBanner message={error} />}
+    <section className="content-card action-card agent-command"><div className="section-heading"><div><h2>Action agent</h2><p>Examples: “Schedule the vendor follow-up tomorrow at 10 AM” or “Draft a follow-up email.”</p></div><span className="action-badge">AGENT</span></div><form className="action-form" onSubmit={runAgent}><textarea required minLength="2" maxLength="1000" value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder="Tell the agent what to do..." /><button className="primary-button">Run agent <span>→</span></button></form>{agentMessage && <p className="success-text">{agentMessage}</p>}</section>
+    <section className="content-card saved-card"><div className="section-heading"><div><h2>Today’s action queue</h2><p>{dailyActions.length} pending agent action{dailyActions.length === 1 ? "" : "s"}</p></div></div>{dailyActions.length ? dailyActions.map((item) => <div className="saved-item" key={item.id}><strong>{item.task}</strong><span>{item.person || "Unassigned"} · {item.due_date ? formatDate(item.due_date) : "No due date"} · {item.recording_name}</span></div>) : <p className="muted">No pending actions from your sessions.</p>}</section>
     <div className="actions-grid">
       <section className="content-card action-card"><div className="section-heading"><div><h2>Calendar event</h2><p>Create a local event after confirmation.</p></div><span className="action-badge">CONFIRM</span></div><form className="action-form" onSubmit={previewEvent}><input required placeholder="Event title" value={calendar.title} onChange={(event) => setCalendar({ ...calendar, title: event.target.value })} /><textarea placeholder="Description" value={calendar.description} onChange={(event) => setCalendar({ ...calendar, description: event.target.value })} /><div className="form-row"><label>Start<input required type="datetime-local" value={calendar.start_time} onChange={(event) => setCalendar({ ...calendar, start_time: event.target.value })} /></label><label>End<input required type="datetime-local" value={calendar.end_time} onChange={(event) => setCalendar({ ...calendar, end_time: event.target.value })} /></label></div><input placeholder="Attendees (comma-separated emails)" value={calendar.attendees} onChange={(event) => setCalendar({ ...calendar, attendees: event.target.value })} /><select value={calendar.source_recording_id} onChange={(event) => setCalendar({ ...calendar, source_recording_id: event.target.value })}><option value="">Source recording (optional)</option>{recordings.map((recording) => <option value={recording.id} key={recording.id}>{recording.filename}</option>)}</select><button className="primary-button">Preview event <span>→</span></button></form>{calendarPreview && <Confirmation title="Confirm calendar event" text={`${calendarPreview.title} · ${formatDate(calendarPreview.start_time)}`} onConfirm={confirmEvent} onCancel={() => setCalendarPreview(null)} />}</section>
       <section className="content-card action-card"><div className="section-heading"><div><h2>Email draft</h2><p>Save a draft for review. Nothing is sent.</p></div><span className="action-badge">DRAFT</span></div><form className="action-form" onSubmit={previewEmail}><input required type="email" placeholder="Recipient email" value={email.recipient} onChange={(event) => setEmail({ ...email, recipient: event.target.value })} /><input required placeholder="Subject" value={email.subject} onChange={(event) => setEmail({ ...email, subject: event.target.value })} /><textarea required rows="5" placeholder="Email body" value={email.body} onChange={(event) => setEmail({ ...email, body: event.target.value })} /><select value={email.source_recording_id} onChange={(event) => setEmail({ ...email, source_recording_id: event.target.value })}><option value="">Source recording (optional)</option>{recordings.map((recording) => <option value={recording.id} key={recording.id}>{recording.filename}</option>)}</select><button className="primary-button">Preview draft <span>→</span></button></form>{emailPreview && <Confirmation title="Save this email draft?" text={`${emailPreview.recipient} · ${emailPreview.subject}`} onConfirm={confirmEmail} onCancel={() => setEmailPreview(null)} />}</section>
@@ -219,7 +246,7 @@ function Actions() {
   </>;
 }
 
-function Insights() {
+function Sessions() {
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState("");
@@ -235,7 +262,7 @@ function Insights() {
     (result[date] ||= []).push(session);
     return result;
   }, {});
-  return <><PageHeading eyebrow="KNOWLEDGE" title="Session insights" subtitle="Review what happened in each recording, organized by date." />{error && <ErrorBanner message={error} />}{!sessions.length ? <section className="content-card"><EmptyState title="No sessions yet" text="Record a session on the device and its insights will appear here after transcription and extraction." /></section> : <div className="insights-groups">{Object.entries(groups).map(([date, items]) => <section className="insight-date-group" key={date}><h2>{date}</h2><div className="session-list">{items.map((session) => <article className={`session-card content-card ${selected?.recording_id === session.recording_id ? "selected" : ""}`} key={session.recording_id}><button className="session-header" onClick={() => setSelected(selected?.recording_id === session.recording_id ? null : session)}><div className="session-icon">✦</div><div><strong>{session.insight?.topic || session.session_name}</strong><span>{formatTime(Math.max(0, session.duration_ms / 1000))} · {session.status}</span></div><span className="session-chevron">{selected?.recording_id === session.recording_id ? "⌃" : "⌄"}</span></button>{selected?.recording_id === session.recording_id && <div className="session-insight">{session.insight ? <><div className="insight-block"><h3>Topic</h3><p>{session.insight.topic || "Topic not identified"}</p></div><div className="insight-block"><h3>Summary</h3><p>{session.insight.summary || "No summary available."}</p></div><div className="insight-block"><h3>Important highlights</h3>{session.insight.highlights.length ? <ul>{session.insight.highlights.map((highlight, index) => <li key={`${session.recording_id}-highlight-${index}`}>{highlight}</li>)}</ul> : <p>No highlights identified.</p>}</div>  <div className="insight-block"><h3>Action items</h3>{session.action_items.length ? <ul>{session.action_items.map((item) => <li key={item.id}>{item.task}{item.person ? ` · ${item.person}` : ""}</li>)}</ul> : <p>No action items identified.</p>}<div className="session-links"><Link className="text-link" to={`/assistant?recording_id=${session.recording_id}`}>Ask about this session <span>→</span></Link><Link className="text-link" to={`/recordings/${session.recording_id}`}>Open full session <span>→</span></Link></div></div></> : <p className="muted">Insights are not ready. Open the recording to generate them after transcription completes.</p>}</div>}</article>)}</div></section>)}</div>}</>;
+  return <><PageHeading eyebrow="WORKSPACE" title="Sessions" subtitle="Every session includes its transcript, insights, action items, and grounded assistant." />{error && <ErrorBanner message={error} />}{!sessions.length ? <section className="content-card"><EmptyState title="No sessions yet" text="Start a session on the device and it will appear here after Wi-Fi upload." /></section> : <div className="insights-groups">{Object.entries(groups).map(([date, items]) => <section className="insight-date-group" key={date}><h2>{date}</h2><div className="session-list">{items.map((session) => <Link className="session-card content-card session-link-card" to={`/sessions/${session.recording_id}`} key={session.recording_id}><div className="session-header"><div className="session-icon">✦</div><div><strong>{session.insight?.topic || session.session_name}</strong><span>{formatTime(Math.max(0, session.duration_ms / 1000))} · {session.status}</span></div><span className="session-chevron">›</span></div><div className="session-summary">{session.insight?.summary || "Insights are being prepared. Open the session to view its transcript and status."}<div className="session-tags"><span>{session.insight ? `${session.insight.highlights.length} highlights` : "Processing"}</span><span>{session.action_items.length} action items</span></div></div></Link>)}</div></section>)}</div>}</>;
 }
 
 function Confirmation({ title, text, onConfirm, onCancel }) {
@@ -244,13 +271,13 @@ function Confirmation({ title, text, onConfirm, onCancel }) {
 
 function PageHeading({ eyebrow, title, subtitle, action }) { return <div className="page-heading"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{subtitle}</p></div>{action}</div>; }
 function Stat({ label, value, detail, icon }) { return <div className="stat-card"><div className="stat-icon">{icon}</div><div><p>{label}</p><strong>{value}</strong><small>{detail}</small></div></div>; }
-function RecordingTable({ recordings }) { return <div className="recording-list">{recordings.map((recording) => <Link className="recording-item" to={`/recordings/${recording.id}`} key={recording.id}><div className="recording-icon">♫</div><div className="recording-info"><strong>{recording.filename}</strong><span>{formatDate(recording.recorded_at)} · {recording.device_id}</span></div><span className="recording-duration">{formatDuration(recording.duration_ms / 1000)}</span><Status status={recording.status} /><span className="chevron">›</span></Link>)}</div>; }
-function SearchResults({ results }) { return <section className="content-card"><div className="section-heading"><div><h2>Search results</h2><p>{results.length} matching transcript segment{results.length === 1 ? "" : "s"}</p></div></div>{results.length ? <div className="search-results">{results.map((result, index) => <Link to={`/recordings/${result.recording_id}`} className="result-item" key={`${result.recording_id}-${index}`}><div><strong>{result.recording_name}</strong><span>{formatDate(result.recorded_at)} · {formatTime(result.start_time)}</span></div><p>{highlight(result.text)}</p></Link>)}</div> : <EmptyState title="No matches found" text="Try a different word or phrase." />}</section>; }
+function RecordingTable({ recordings }) { return <div className="recording-list">{recordings.map((recording) => <Link className="recording-item" to={`/sessions/${recording.id}`} key={recording.id}><div className="recording-icon">♫</div><div className="recording-info"><strong>{recording.filename}</strong><span>{formatDate(recording.recorded_at)} · {recording.device_id}</span></div><span className="recording-duration">{formatDuration(recording.duration_ms / 1000)}</span><Status status={recording.status} /><span className="chevron">›</span></Link>)}</div>; }
+function SearchResults({ results }) { return <section className="content-card"><div className="section-heading"><div><h2>Search results</h2><p>{results.length} matching transcript segment{results.length === 1 ? "" : "s"}</p></div></div>{results.length ? <div className="search-results">{results.map((result, index) => <Link to={`/sessions/${result.recording_id}`} className="result-item" key={`${result.recording_id}-${index}`}><div><strong>{result.recording_name}</strong><span>{formatDate(result.recorded_at)} · {formatTime(result.start_time)}</span></div><p>{highlight(result.text)}</p></Link>)}</div> : <EmptyState title="No matches found" text="Try a different word or phrase." />}</section>; }
 function Status({ status }) { return <span className={`status ${status}`}><span />{status}</span>; }
 function Meta({ label, value }) { return <div className="meta-row"><span>{label}</span><strong>{value}</strong></div>; }
 function EmptyState({ title, text }) { return <div className="empty-state"><div className="empty-icon">◌</div><h3>{title}</h3><p>{text}</p></div>; }
 function ErrorBanner({ message }) { return <div className="error-banner">{message}</div>; }
-function Loading() { return <div className="loading">Loading your recordings...</div>; }
+function Loading() { return <div className="loading">Loading your sessions...</div>; }
 function formatDuration(seconds) { if (!seconds) return "0m"; const mins = Math.floor(seconds / 60); const secs = Math.round(seconds % 60); return mins ? `${mins}m ${secs}s` : `${secs}s`; }
 function formatTime(seconds) { return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`; }
 function formatDate(value) { return new Date(value).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }); }

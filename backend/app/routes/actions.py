@@ -3,15 +3,71 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import CalendarEvent, EmailDraft, Recording
+from app.models import ActionItem, CalendarEvent, EmailDraft, Recording
+from app.services.action_agent_service import execute_instruction
 from app.schemas import (
+    AgentActionResponse,
+    AgentInstructionRequest,
     CalendarEventInput,
     CalendarEventResponse,
+    DailyActionResponse,
     EmailDraftInput,
     EmailDraftResponse,
 )
 
 router = APIRouter(prefix="/actions", tags=["actions"])
+
+
+@router.post("/agent", response_model=AgentActionResponse)
+def run_agent(data: AgentInstructionRequest) -> AgentActionResponse:
+    try:
+        plan, result = execute_instruction(data.instruction, data.recording_id)
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if plan.action_type == "create_calendar":
+        return AgentActionResponse(
+            message="Agent created a local calendar event.",
+            action_type=plan.action_type,
+            calendar_event=_event_response(result),
+        )
+    if plan.action_type == "create_email":
+        return AgentActionResponse(
+            message="Agent saved an email draft for review.",
+            action_type=plan.action_type,
+            email_draft=result,
+        )
+    if plan.action_type == "complete_action":
+        return AgentActionResponse(
+            message="Agent marked the action complete.",
+            action_type=plan.action_type,
+            action_item_id=result.id,
+        )
+    return AgentActionResponse(
+        message="The agent did not find enough information to perform that action.",
+        action_type=plan.action_type,
+    )
+
+
+@router.get("/daily", response_model=list[DailyActionResponse])
+def list_daily_actions(db: Session = Depends(get_db)) -> list[DailyActionResponse]:
+    rows = db.execute(
+        select(ActionItem, Recording)
+        .join(Recording, Recording.id == ActionItem.recording_id)
+        .where(ActionItem.status != "completed")
+        .order_by(ActionItem.due_date.is_(None), ActionItem.due_date, Recording.recorded_at.desc())
+    ).all()
+    return [
+        DailyActionResponse(
+            id=item.id,
+            person=item.person,
+            task=item.task,
+            due_date=item.due_date,
+            status=item.status,
+            recording_name=recording.filename,
+            recorded_at=recording.recorded_at,
+        )
+        for item, recording in rows
+    ]
 
 
 def _validate_event(data: CalendarEventInput, db: Session) -> None:

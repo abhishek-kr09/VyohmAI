@@ -82,6 +82,9 @@ def process_recording(recording_id: str) -> None:
             ]
             recording.status = "completed"
             db.commit()
+        from app.services.extraction_service import process_insights
+
+        process_insights(recording_id)
     except Exception:
         logger.exception("Transcription failed for recording %s", recording_id)
         with SessionLocal() as db:

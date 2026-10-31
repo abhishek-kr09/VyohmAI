@@ -27,6 +27,29 @@ from app.services.transcription_service import process_recording
 router = APIRouter(prefix="/recordings", tags=["recordings"])
 
 
+def _json_list(value: str | None) -> list:
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def _insight_response(insight: RecordingInsight) -> InsightResponse:
+    return InsightResponse(
+        id=insight.id,
+        recording_id=insight.recording_id,
+        topic=insight.topic,
+        summary=insight.summary,
+        highlights=_json_list(insight.highlights),
+        people=[PersonInsight.model_validate(item) for item in _json_list(insight.people) if isinstance(item, dict)],
+        meetings=[MeetingInsight.model_validate(item) for item in _json_list(insight.meetings) if isinstance(item, dict)],
+        created_at=insight.created_at,
+    )
+
+
 @router.get("", response_model=list[RecordingResponse])
 def list_recordings(db: Session = Depends(get_db)) -> list[Recording]:
     recordings = list(db.scalars(select(Recording).order_by(Recording.recorded_at.desc())))
@@ -58,16 +81,7 @@ def list_insights(db: Session = Depends(get_db)) -> list[InsightSessionResponse]
             recorded_at=recording.recorded_at,
             duration_ms=recording.duration_ms,
             status=recording.status,
-            insight=InsightResponse(
-                id=insight.id,
-                recording_id=insight.recording_id,
-                topic=insight.topic,
-                summary=insight.summary,
-                highlights=json.loads(insight.highlights or "[]"),
-                people=[PersonInsight.model_validate(item) for item in json.loads(insight.people or "[]")],
-                meetings=[MeetingInsight.model_validate(item) for item in json.loads(insight.meetings or "[]")],
-                created_at=insight.created_at,
-            ),
+            insight=_insight_response(insight),
             action_items=[ActionItemResponse.model_validate(item) for item in db.scalars(
                 select(ActionItem).where(ActionItem.recording_id == recording.id)
             )],
@@ -92,16 +106,7 @@ def get_recording(recording_id: str, db: Session = Depends(get_db)) -> Recording
     actions = list(db.scalars(select(ActionItem).where(ActionItem.recording_id == recording_id)))
     insight_response = None
     if insight is not None:
-        insight_response = InsightResponse(
-            id=insight.id,
-            recording_id=insight.recording_id,
-            topic=insight.topic,
-            summary=insight.summary,
-            highlights=json.loads(insight.highlights or "[]"),
-            people=[PersonInsight.model_validate(item) for item in json.loads(insight.people or "[]")],
-            meetings=[MeetingInsight.model_validate(item) for item in json.loads(insight.meetings or "[]")],
-            created_at=insight.created_at,
-        )
+        insight_response = _insight_response(insight)
     return RecordingDetailResponse(
         **RecordingResponse.model_validate(recording).model_dump(),
         transcript=[TranscriptSegmentResponse.model_validate(segment) for segment in segments],

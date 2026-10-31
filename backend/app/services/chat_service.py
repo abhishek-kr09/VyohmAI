@@ -160,7 +160,8 @@ def answer_question(question: str, recording_id: str | None = None) -> tuple[str
     retrieved = retrieve_evidence(question, recording_id=recording_id)
     if not retrieved:
         return (
-            "I could not find enough evidence in your recordings to answer that question.",
+            "I could not find enough evidence in your recordings to answer that question; "
+            "the recordings do not provide enough evidence.",
             [],
         )
     completion = _answer_from_llm(question, retrieved)

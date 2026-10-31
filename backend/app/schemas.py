@@ -151,6 +151,24 @@ class EmailDraftResponse(EmailDraftInput):
     model_config = {"from_attributes": True}
 
 
+class AgentInstructionRequest(BaseModel):
+    instruction: str = Field(min_length=2, max_length=1000)
+    recording_id: str | None = None
+
+
+class AgentActionResponse(BaseModel):
+    message: str
+    action_type: str
+    action_item_id: str | None = None
+    calendar_event: CalendarEventResponse | None = None
+    email_draft: EmailDraftResponse | None = None
+
+
+class DailyActionResponse(ActionItemResponse):
+    recording_name: str
+    recorded_at: datetime
+
+
 class TranscriptSegmentResponse(BaseModel):
     id: str
     start_time: float
