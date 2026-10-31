@@ -180,7 +180,3 @@ Then open **Sessions**, review the transcript, and use **AI Assistant** or
 - Email actions create drafts only; they do not send email automatically.
 - Calendar actions are stored locally; they do not connect to an external calendar.
 - RAG answers are restricted to retrieved transcript and action evidence.
-
-## License
-
-Add the project's license before publishing to GitHub.

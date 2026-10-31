@@ -156,6 +156,31 @@ class AgentInstructionRequest(BaseModel):
     recording_id: str | None = None
 
 
+class AgentPlanPayload(BaseModel):
+    action_type: str
+    action_item_id: str | None = None
+    title: str | None = None
+    description: str | None = None
+    recipient: str | None = None
+    subject: str | None = None
+    body: str | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    attendees: list[str] = Field(default_factory=list)
+
+
+class AgentPlanResponse(BaseModel):
+    message: str
+    requires_confirmation: bool
+    plan: AgentPlanPayload
+    recording_id: str | None = None
+
+
+class AgentConfirmRequest(BaseModel):
+    plan: AgentPlanPayload
+    recording_id: str | None = None
+
+
 class AgentActionResponse(BaseModel):
     message: str
     action_type: str
@@ -165,6 +190,7 @@ class AgentActionResponse(BaseModel):
 
 
 class DailyActionResponse(ActionItemResponse):
+    recording_id: str
     recording_name: str
     recorded_at: datetime
 

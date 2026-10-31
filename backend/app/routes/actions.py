@@ -4,10 +4,19 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ActionItem, CalendarEvent, EmailDraft, Recording
-from app.services.action_agent_service import execute_instruction
+from app.services.action_agent_service import (
+    AgentPlan,
+    describe_plan,
+    execute_plan,
+    plan_action_item,
+    plan_instruction,
+)
 from app.schemas import (
     AgentActionResponse,
+    AgentConfirmRequest,
     AgentInstructionRequest,
+    AgentPlanPayload,
+    AgentPlanResponse,
     CalendarEventInput,
     CalendarEventResponse,
     DailyActionResponse,
@@ -18,12 +27,7 @@ from app.schemas import (
 router = APIRouter(prefix="/actions", tags=["actions"])
 
 
-@router.post("/agent", response_model=AgentActionResponse)
-def run_agent(data: AgentInstructionRequest) -> AgentActionResponse:
-    try:
-        plan, result = execute_instruction(data.instruction, data.recording_id)
-    except (RuntimeError, ValueError) as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+def _agent_response(plan, result) -> AgentActionResponse:
     if plan.action_type == "create_calendar":
         return AgentActionResponse(
             message="Agent created a local calendar event.",
@@ -48,13 +52,59 @@ def run_agent(data: AgentInstructionRequest) -> AgentActionResponse:
     )
 
 
+def _plan_response(plan: AgentPlan, recording_id: str | None) -> AgentPlanResponse:
+    return AgentPlanResponse(
+        message=describe_plan(plan),
+        requires_confirmation=plan.action_type != "no_action",
+        plan=AgentPlanPayload(**plan.model_dump()),
+        recording_id=recording_id,
+    )
+
+
+@router.post("/agent", response_model=AgentPlanResponse)
+def run_agent(data: AgentInstructionRequest) -> AgentPlanResponse:
+    try:
+        plan = plan_instruction(data.instruction, data.recording_id)
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _plan_response(plan, data.recording_id)
+
+
+@router.post("/agent/confirm", response_model=AgentActionResponse)
+def confirm_agent(data: AgentConfirmRequest) -> AgentActionResponse:
+    try:
+        plan = AgentPlan.model_validate(data.plan.model_dump())
+        plan, result = execute_plan(plan, data.recording_id)
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _agent_response(plan, result)
+
+
+@router.post("/items/{action_item_id}/run", response_model=AgentPlanResponse)
+def run_action_item(action_item_id: str) -> AgentPlanResponse:
+    try:
+        plan, recording_id = plan_action_item(action_item_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _plan_response(plan, recording_id)
+
+
 @router.get("/daily", response_model=list[DailyActionResponse])
-def list_daily_actions(db: Session = Depends(get_db)) -> list[DailyActionResponse]:
-    rows = db.execute(
+def list_daily_actions(
+    recording_id: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> list[DailyActionResponse]:
+    query = (
         select(ActionItem, Recording)
         .join(Recording, Recording.id == ActionItem.recording_id)
         .where(ActionItem.status != "completed")
-        .order_by(ActionItem.due_date.is_(None), ActionItem.due_date, Recording.recorded_at.desc())
+    )
+    if recording_id:
+        query = query.where(ActionItem.recording_id == recording_id)
+    rows = db.execute(
+        query.order_by(ActionItem.due_date.is_(None), ActionItem.due_date, Recording.recorded_at.desc())
     ).all()
     return [
         DailyActionResponse(
@@ -63,6 +113,7 @@ def list_daily_actions(db: Session = Depends(get_db)) -> list[DailyActionRespons
             task=item.task,
             due_date=item.due_date,
             status=item.status,
+            recording_id=recording.id,
             recording_name=recording.filename,
             recorded_at=recording.recorded_at,
         )
