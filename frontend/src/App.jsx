@@ -212,8 +212,23 @@ function Assistant() {
       <div className="suggestion-row">{suggestions.map((suggestion) => <button key={suggestion} onClick={() => setQuestion(suggestion)}>{suggestion}</button>)}</div>
     </section>
     {error && <ErrorBanner message={error} />}
-    {response && <section className="content-card chat-response"><div className="section-heading"><div><h2>Answer</h2><p>{response.grounded ? "Grounded in your recordings" : "No verified evidence"}</p></div></div><p className="answer-text">{response.answer}</p>{response.evidence.length ? <div className="evidence-list"><h3>Evidence</h3>{response.evidence.map((item) => <Link className="evidence-item" to={`/recordings/${item.recording_id}`} key={`${item.recording_id}-${item.start_time}`}><div><strong>{item.recording_name}</strong><span>{formatTime(item.start_time)} - {formatTime(item.end_time)}</span></div><p>{item.quote}</p></Link>)}</div> : <p className="muted">No transcript evidence was found for this answer.</p>}</section>}
+    {response && <section className="content-card chat-response"><div className="section-heading"><div><h2>Answer</h2><p>{response.grounded ? "Grounded in your recordings" : "No verified evidence"}</p></div></div><AnswerText text={response.answer} />{response.evidence.length ? <div className="evidence-list"><h3>Evidence</h3>{response.evidence.map((item) => <Link className="evidence-item" to={`/recordings/${item.recording_id}`} key={`${item.recording_id}-${item.start_time}`}><div><strong>{item.recording_name}</strong><span>{formatTime(item.start_time)} - {formatTime(item.end_time)}</span></div><p>{item.quote}</p></Link>)}</div> : <p className="muted">No transcript evidence was found for this answer.</p>}</section>}
   </>;
+}
+
+function AnswerText({ text }) {
+  const blocks = [];
+  let bullets = [];
+  const flush = () => { if (bullets.length) { blocks.push({ type: "list", items: bullets }); bullets = []; } };
+  text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).forEach((line) => {
+    const bullet = line.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
+    if (bullet) bullets.push(bullet[1]);
+    else { flush(); blocks.push({ type: "text", value: line }); }
+  });
+  flush();
+  return <div className="answer-body">{blocks.map((block, index) => block.type === "list"
+    ? <ul className="answer-list" key={index}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</ul>
+    : <p className="answer-text" key={index}>{block.value}</p>)}</div>;
 }
 
 function Actions() {
